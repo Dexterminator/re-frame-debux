@@ -33,3 +33,20 @@
            {:form (+ 1 (* 2 3) (+ 4 5))
             :indent-level 0
             :result 16}] @traces)))
+
+(deftest indent-test3
+  (dbgn (-> 1
+            (+ 2 (+ 3))
+            (+ 5)))
+  (is (= '[{:form 1
+            :indent-level 1
+            :result 1}
+           {:form (+ 3)
+            :indent-level 3
+            :result 3}
+           {:form (+ 2 (+ 3))
+            :indent-level 2
+            :result 6}
+           {:form (+ 1)
+            :indent-level 1
+            :result 11}] @traces)))
