@@ -194,6 +194,51 @@
 
         :else (recur (z/next loc))))))
 
+(defn debux-form? [sym]
+  (contains? #{'debux.common.macro-specs/skip-outer
+               'debux.common.macro-specs/skip
+               'debux.common.macro-specs/o-skip
+               'debux.common.util/spy-last
+               'debux.common.util/spy-first
+               'debux.common.util/spy-comp}
+             sym))
+
+(defn depth
+  "Calculate how far we are inside the zipper, by ascending straight up
+  until we can't get any higher."
+  ;;  There is probably a smarter way to do
+  ;; this than checking for nil, but I'm not sure what it is.
+  [loc]
+  (loop [loc loc
+         depth -1]
+    (if (nil? loc)
+      depth
+      (recur (z/up loc)
+             (inc depth)))))
+
+(defn debux-symbol? [sym]
+  (contains? #{'debux.dbgn/d
+               'ut/spy-first
+               'ut/spy-last
+               'ut/spy-comp}
+             sym))
+
+(defn real-depth
+  "Calculate how far we are inside the zipper, ignoring synthetic debux forms,
+   by ascending straight up until we can't get any higher."
+  ;;  There is probably a smarter way to do
+  ;; this than checking for nil, but I'm not sure what it is.
+  [loc]
+  (loop [loc   loc
+         depth -1]
+    (if (nil? loc)
+      depth
+      (let [node (z/node loc)]
+        (recur (z/up loc)
+               (if (and (sequential? node)
+                        (debux-symbol? (first node)))
+                 depth
+                 (inc depth)))))))
 
 ;;; insert/remove d
 (defn insert-d [form d-sym env]
@@ -201,8 +246,8 @@
   ;(println "INSERT-D" form d-sym env)
   (loop [loc (ut/sequential-zip form)
          indent 0]
-    (let [node (z/node loc)]
-      ;(ut/d node)
+    (let [node (z/node loc)
+          indent (real-depth loc)]
       (cond
         (z/end? loc) (z/root loc)
 
@@ -313,14 +358,7 @@
         :else
         (recur (z/next loc) indent)))))
 
-(defn debux-form? [sym]
-  (contains? #{'debux.common.macro-specs/skip-outer
-               'debux.common.macro-specs/skip
-               'debux.common.macro-specs/o-skip
-               'debux.common.util/spy-last
-               'debux.common.util/spy-first
-               'debux.common.util/spy-comp}
-             sym))
+
 
 (defmacro d [indent form]
   `(let [opts#   ~'+debux-dbg-opts+
@@ -329,13 +367,13 @@
 
          result# ~form
          result# (ut/take-n-if-seq n# result#)]
-     (println "LEVEL" ~indent)
+     ;(println "LEVEL" ~indent)
      (ut/send-trace! {:form '~(remove-d form 'debux.dbgn/d)
                       :result result#
                       :indent-level ~indent})
      (ut/print-form-with-indent (ut/form-header '~(remove-d form 'debux.dbgn/d) msg#)
-                                @ut/indent-level*)
-     (ut/pprint-result-with-indent result# @ut/indent-level*)
+                                ~(inc (inc indent)))
+     (ut/pprint-result-with-indent result# ~(inc (inc indent)))
      result#))
 
 
